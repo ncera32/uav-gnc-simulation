@@ -1,7 +1,6 @@
 import numpy as np
 
-from src.rotations import body_to_ned
-from src.rotations import ned_to_body
+from src.rotations import body_to_ned, ned_to_body, euler_rate_matrix, body_rates_to_euler_rates
 
 # If the aircraft has zero roll, pitch, and yaw, the body-to-NED transformation shall be the identity matrix.
 def test_zero_attitude():
@@ -87,6 +86,89 @@ def test_rotation_matrix_orthogonal():
         atol = 1e-12
     )
 
+# testing euler rate DCM rotation matrix at zero attitude 
+def test_euler_rate_matrix_zero_attitude():
+    T = euler_rate_matrix(
+        phi = 0.0,
+        theta = 0.0
+    )
 
+    np.testing.assert_allclose(
+        T,
+        np.eye(3),
+        atol = 1e-12
+    )
 
+# testing euler rates don't change when attitude is zero
+def test_euler_rates_zero_attitude():
+    T = euler_rate_matrix(
+        phi = 0.0,
+        theta = 0.0
+    )
 
+    body_rates = np.array([
+        0.1, 
+        0.2,
+        0.3
+    ])
+
+    euler_rates = T @ body_rates
+
+    expected = np.array([
+        0.1,
+        0.2,
+        0.3
+    ])
+
+    np.testing.assert_allclose(
+        euler_rates,
+        expected,
+        atol = 1e-12
+    )
+
+def test_euler_rates_nonzero_roll():
+    phi = np.deg2rad(30.0)
+    theta = 0.0
+
+    T = euler_rate_matrix(phi, theta)
+
+    body_rates = np.array([
+        0.0,
+        0.0,
+        0.2
+    ])
+
+    euler_rates = T @ body_rates
+
+    expected = np.array([
+        0.0,
+        -0.1,
+        0.2*np.cos(phi)
+    ])
+
+    np.testing.assert_allclose(
+        euler_rates,
+        expected,
+        atol = 1e-12
+    )
+
+def test_body_rates_to_euler_rates():
+    euler_rates = body_rates_to_euler_rates(
+        phi = 0.0,
+        theta = 0.0,
+        p = 0.1,
+        q = 0.2,
+        r = 0.3
+    )
+
+    expected = np.array([
+        0.1,
+        0.2,
+        0.3
+    ])
+
+    np.testing.assert_allclose(
+        euler_rates,
+        expected,
+        atol = 1e-12
+    )
