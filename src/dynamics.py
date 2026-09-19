@@ -99,6 +99,8 @@ def inertia_tensor(Ixx, Iyy, Izz, Ixz):
         [-Ixz, 0.0, Izz]
     ])
 
+# will have to define an inertia tensor using Aerosonde parameters for inertia (I = inertia_tensor(aircraft.Ixx, ...))
+
 # defining the rotational dynamics eqn
 def rotational_dynamics(state, moments_body, inertia):
     
@@ -121,3 +123,49 @@ def rotational_dynamics(state, moments_body, inertia):
     )
 
     return omega_dot
+
+def state_derivative(
+        state,
+        forces_body,
+        moments_body,
+        mass,
+        inertia
+):
+    # 1. Translational and rotational kinematics
+    position_dot, euler_dot = kinematics(state)
+
+    # 2. Calculate gravitational force in body frame
+    gravity_body = gravity_force_body(
+        state,
+        mass
+    )
+
+    # 3. Combine non-gravitational forces with gravity
+    total_forces_body = (
+        np.asarray(forces_body, dtype = float) + gravity_body
+    )
+
+    # 4. Translational dynamics
+    velocity_dot = translational_dynamics(
+        state,
+        total_forces_body,
+        mass
+    )
+
+    # 5. Rotational dynamics
+    angular_rates_dot = rotational_dynamics(
+        state,
+        moments_body,
+        inertia
+    )
+
+    # 6. Assemble the complete state derivative 
+    x_dot = np.concatenate([
+        position_dot,
+        velocity_dot,
+        euler_dot,
+        angular_rates_dot
+    ])
+
+    return x_dot
+

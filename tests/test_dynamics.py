@@ -1,7 +1,7 @@
 import numpy as np
 
 from src.state import AircraftState
-from src.dynamics import kinematics, translational_dynamics, gravity_force_body, inertia_tensor, rotational_dynamics
+from src.dynamics import kinematics, translational_dynamics, gravity_force_body, inertia_tensor, rotational_dynamics, state_derivative
 
 # An aircraft pointing North, flying forward at 25 m/s, with no angular velocity should move North at 25 m/s while maintaining its current attitude.
 def test_level_northward_kinematics():
@@ -317,3 +317,134 @@ def test_rotational_dynamics_coupling():
         expected,
         atol = 1e-12
     )
+
+# testing state derivative function with stationary, level aircraft with no non-grav forces or applied moments
+def test_state_derivative_gravity_only():
+    state = AircraftState()
+
+    forces_body = np.zeros(3)
+    moments_body = np.zeros(3)
+
+    mass = 10.0
+
+    inertia = np.diag([
+        2.0,
+        3.0,
+        4.0
+    ])
+
+    x_dot = state_derivative(
+        state,
+        forces_body,
+        moments_body,
+        mass,
+        inertia
+    )
+
+    expected = np.array([
+        0.0, 0.0, 0.0,       # position rates
+        0.0, 0.0, 9.80665,   # body vel rates
+        0.0, 0.0, 0.0,       # Euler angle rates
+        0.0, 0.0, 0.0        # Angular-rate derivatives
+    ])
+
+    np.testing.assert_allclose(
+        x_dot,
+        expected,
+        atol = 1e-12
+    )
+
+# testing state derivative function with a force-balanced aircraft (not proof that Aerosonde trims at 25 m/s... deliberately constructed to test function )
+def test_state_derivative_balanced_level_flight():
+    mass = 10.0
+    g = 9.80665
+
+    state = AircraftState(
+        pd = -100.0,
+        u = 25.0
+    )
+
+    forces_body = np.array([
+        0.0,
+        0.0,
+        -mass * g
+    ])
+
+    moments_body = np.zeros(3)
+
+    inertia = np.diag([
+        2.0,
+        3.0,
+        4.0
+    ])
+
+    x_dot = state_derivative(
+        state,
+        forces_body,
+        moments_body,
+        mass,
+        inertia
+    )
+
+    expected = np.array([
+        25.0, 0.0, 0.0,
+        0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0
+    ])
+
+    np.testing.assert_allclose(
+        x_dot,
+        expected,
+        atol = 1e-12
+    )
+
+
+# testing state derivative function when several derivatives are nonzero simultaneously
+def test_state_derivative_combined_motion():
+    mass = 10.0
+    g = 9.80665
+
+    state = AircraftState(
+        u = 20.0,
+        r = 0.1
+    )
+
+    forces_body = np.array([
+        20.0,
+        10.0,
+        -mass * g
+    ])
+
+    moments_body = np.zeros(3)
+
+    inertia = np.diag([
+        2.0,
+        3.0,
+        4.0
+    ])
+
+    x_dot = state_derivative(
+        state,
+        forces_body,
+        moments_body,
+        mass,
+        inertia
+    )
+
+    expected = np.array([
+        20.0, 0.0, 0.0,
+        2.0, -1.0, 0.0,
+        0.0, 0.0, 0.1,
+        0.0, 0.0, 0.0
+    ])
+
+    np.testing.assert_allclose(
+        x_dot,
+        expected,
+        atol = 1e-12
+    )
+
+    assert x_dot.shape == (12,)
+
+
