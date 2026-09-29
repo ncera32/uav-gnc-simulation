@@ -23,7 +23,7 @@ class AircraftParameters:
 
     CL0 = 0.23 # zero-angle-of-attack lift coefficient
     CD0 = 0.0424 # zero-lift/baseline drage coefficient
-    CD_P = 0.043 # Parasitic drag coefficient
+    CD_P = 0.043 # Parasitic drag coefficient [Used in nonlinear drag model (future implementation)]
     CY0 = 0 # Base side force coefficient
     Cm0 = 0.0135 # Base pitching moment coefficient
     Cl0 = 0 # Base rolling moment coefficient
