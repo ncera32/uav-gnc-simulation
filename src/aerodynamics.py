@@ -97,6 +97,7 @@ def longitudinal_forces_moments(rho, Va, alpha, pitch_rate, delta_e, S, c, coeff
     return forces_body, moments_body
 
 # WRAPPER Calculate longitudinal aerodynamic forces and moments using the current aircraft state and Aerosonde parameters.
+# Uses the linear longitudinal aerodynamic model. Neglects explicit sideslip-dependent longitudinal coefficients and aerodynamic cross-coupling effects
 def aerosonde_longitudinal_forces_moments(state, delta_e, aircraft):
 
     # 1. calculate altitude from NED position
@@ -110,10 +111,10 @@ def aerosonde_longitudinal_forces_moments(state, delta_e, aircraft):
 
     # This prevents from accidentally treating the longitudinal-only model as a complete aerodynamic model during a maneuver with sideslip
     # remove this restriction when we implement the full three-dimensional aerodynamic model
-    if not np.isclose(beta, 0.0, atol = 1e-8):
-        raise ValueError(
-            "Longitudinal aerodynamic model requires zero sideslip"
-        )
+    #if not np.isclose(beta, 0.0, atol = 1e-8):
+    #    raise ValueError(
+    #        "Longitudinal aerodynamic model requires zero sideslip"
+    #    )
 
     # 4. Gather the aersonde longitudinal coefficients
     coefficients = {
@@ -285,6 +286,39 @@ def aerosonde_lateral_directional_forces_moments(state, delta_a, delta_r, aircra
         b = aircraft.b,
         coefficients = coefficients
     )
+
+
+# Caculates the COMPLETE aerodynamic body-axis forces and moments using linear Aerosonde aero. model 
+def aerodynamic_forces_moments(state, delta_e, delta_a, delta_r, aircraft):
+
+    # calculate longitudinal contributions
+    forces_long, moments_long = (
+        aerosonde_longitudinal_forces_moments(
+            state = state,
+            delta_e = delta_e,
+            aircraft = aircraft
+        )
+    )
+
+    # calculate lateral-directional contributions
+    forces_lat, moments_lat = (
+        aerosonde_lateral_directional_forces_moments(
+            state = state,
+            delta_a = delta_a,
+            delta_r = delta_r,
+            aircraft = aircraft
+        )
+    )
+
+    # combine the contributions
+    forces_body = forces_long + forces_lat
+
+    moments_body = moments_long + moments_lat
+
+    return forces_body, moments_body
+
+
+
 
 
 

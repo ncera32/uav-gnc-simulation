@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from src.aerodynamics import lift_drag, lift_drag_to_body, longitudinal_coefficients, pitching_moment, longitudinal_forces_moments, aerosonde_longitudinal_forces_moments, lateral_directional_coefficients, lateral_directional_forces_moments, aerosonde_lateral_directional_forces_moments
+from src.aerodynamics import lift_drag, lift_drag_to_body, longitudinal_coefficients, pitching_moment, longitudinal_forces_moments, aerosonde_longitudinal_forces_moments, lateral_directional_coefficients, lateral_directional_forces_moments, aerosonde_lateral_directional_forces_moments, aerodynamic_forces_moments
 from src.aircraft import AircraftParameters
 from src.state import AircraftState
 from src.atmosphere import density
@@ -214,21 +214,21 @@ def test_aerosonde_longitudinal_forces_moments():
     )
 
 # confirm that aerosonde longitudinal function rejects nonzero sideslip
-def test_aerosonde_longitudinal_rejects_sideslip():
-    aircraft = AircraftParameters
+# def test_aerosonde_longitudinal_rejects_sideslip():
+#    aircraft = AircraftParameters
 
-    state = AircraftState(
-        u = 25.0,
-        v = 1.0,
-        w = 0.0
-    )
+#    state = AircraftState(
+#        u = 25.0,
+#        v = 1.0,
+#        w = 0.0
+#    )
 
-    with pytest.raises(ValueError):
-        aerosonde_longitudinal_forces_moments(
-            state = state,
-            delta_e = 0.0,
-            aircraft = aircraft
-        )
+#    with pytest.raises(ValueError):
+#        aerosonde_longitudinal_forces_moments(
+#            state = state,
+#            delta_e = 0.0,
+#            aircraft = aircraft
+#        )
 
 # ^^^ This is a temporary safeguard for the longitudinal-only implementation, not a restriction wanted in the eventual 6-DOF aircraft model
         
@@ -572,6 +572,171 @@ def test_aerosonde_lateral_directional_yaw_roll():
         expected_moments,
         atol = 1e-10
     )
+
+# nonzero angle of attack, sideslip, deflections (elevator, aileron, rudder), zero angular rates
+def test_combined_aero_forces_moments():
+
+    aircraft = AircraftParameters()
+
+    state = AircraftState(
+        pd = 0.0,
+        u = 25.0,
+        v = 0.5,
+        w = 1.0,
+        p = 0.0,
+        q = 0.0,
+        r = 0.0
+    )
+
+    delta_e = 0.02
+    delta_a = 0.03
+    delta_r = -0.01
+
+    forces, moments = aerodynamic_forces_moments(
+        state = state,
+        delta_e = delta_e,
+        delta_a = delta_a,
+        delta_r = delta_r,
+        aircraft = aircraft
+    )
+
+    # independently calc air data
+    Va = np.sqrt(
+        state.u**2
+        + state.v**2
+        + state.w**2
+    )
+
+    alpha = np.arctan2(state.w, state.u)
+
+    beta = np.arcsin(state.v / Va)
+
+    # atmospheric density and dynamic pressure
+    rho = density(0.0)
+
+    q_bar = 0.5 * rho * Va**2
+
+    # ----------------------------------------------
+    # Longitudinal Coefficients
+    # ----------------------------------------------
+
+    CL =  (
+        aircraft.CL0
+        + aircraft.CL_alpha * alpha
+        + aircraft.CL_delta_e * delta_e
+    )
+
+    CD = (
+        aircraft.CD0
+        + aircraft.CD_alpha * alpha
+        + aircraft.CD_delta_e * delta_e
+    )
+
+    Cm = (
+        aircraft.Cm0
+        + aircraft.Cm_alpha * alpha
+        + aircraft.Cm_delta_e * delta_e
+    )
+
+    # dimensional lift and drag
+    lift = q_bar * aircraft.S * CL
+    drag = q_bar * aircraft.S * CD
+
+    # Convert lift and drag to body-axis
+    expected_Fx = (
+        -drag * np.cos(alpha)
+        + lift * np.sin(alpha)
+    )
+
+    expected_Fz = (
+        -drag * np.sin(alpha)
+        - lift * np.cos(alpha)
+    )
+
+    expected_M = q_bar * aircraft.S * aircraft.c * Cm
+
+    # ---------------------------------------------------
+    # Lateral-directional coefficients
+    # ---------------------------------------------------
+
+    CY = (
+        aircraft.CY0
+        + aircraft.CY_beta * beta
+        + aircraft.CY_delta_a * delta_a
+        + aircraft.CY_delta_r * delta_r
+    )
+
+    Cl = (
+        aircraft.Cl0
+        + aircraft.Cl_beta * beta
+        + aircraft.Cl_delta_a * delta_a
+        + aircraft.Cl_delta_r * delta_r
+    )
+
+    Cn = (
+        aircraft.Cn0
+        + aircraft.Cn_beta * beta
+        + aircraft.Cn_delta_a * delta_a
+        + aircraft.Cn_delta_r * delta_r
+    )
+
+    expected_Fy = q_bar * aircraft.S * CY
+    expected_L = q_bar * aircraft.S * aircraft.b * Cl
+    expected_N = q_bar * aircraft.S * aircraft.b * Cn
+
+    # -----------------------------------------------------
+    # Expected Combined Vectors
+    # -----------------------------------------------------
+
+    expected_forces = np.array([
+        expected_Fx,
+        expected_Fy,
+        expected_Fz
+    ])
+
+    expected_moments = np.array([
+        expected_L,
+        expected_M,
+        expected_N
+    ])
+
+    np.testing.assert_allclose(
+        forces,
+        expected_forces,
+        rtol = 1e-10,
+        atol = 1e-10
+    )
+
+    np.testing.assert_allclose(
+        moments,
+        expected_moments,
+        rtol = 1e-10,
+        atol = 1e-10
+    )
+
+# ^^^^ this test checks simultaneously: 
+# - correct airspeed, AoA, sideslip
+# - correct elevator contribution to lift, drag, and pitching moment
+# - correct aileron and rudder contributions
+# - correct body-axis lift/drag conversion
+# - all six aerodynamic components appear in the correct positions
+    
+# Because the angular rates are zero, their contributions disappear from the expected calculations. 
+# previous tests have already verified the nondimensional angular-rate calculations
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
