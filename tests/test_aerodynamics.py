@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from src.aerodynamics import lift_drag, lift_drag_to_body, longitudinal_coefficients, pitching_moment, longitudinal_forces_moments, aerosonde_longitudinal_forces_moments, lateral_directional_coefficients, lateral_directional_forces_moments
+from src.aerodynamics import lift_drag, lift_drag_to_body, longitudinal_coefficients, pitching_moment, longitudinal_forces_moments, aerosonde_longitudinal_forces_moments, lateral_directional_coefficients, lateral_directional_forces_moments, aerosonde_lateral_directional_forces_moments
 from src.aircraft import AircraftParameters
 from src.state import AircraftState
 from src.atmosphere import density
@@ -356,4 +356,229 @@ def test_lateral_directional_nonzero_yaw_roll_rates():
         expected_moments,
         atol = 1e-10
     )
+
+# nonzero sideslip and no aileron and rudder deflection
+def test_aerosonde_lateral_directional_forces_moments():
+
+    aircraft = AircraftParameters()
+
+    # moving forward with small lateral velocity
+    state = AircraftState(
+        pd = 0.0,
+        u = 25.0,
+        v = 1.0,
+        w = 0.0,
+        p = 0.0,
+        r = 0.0
+    )
+
+    delta_a = 0.0
+    delta_r = 0.0
+
+    forces, moments = aerosonde_lateral_directional_forces_moments(
+        state = state,
+        delta_a = delta_a,
+        delta_r = delta_r,
+        aircraft = aircraft
+    )
+
+    # independently calculate expected air data
+    Va = np.sqrt(25.0**2 + 1.0**2)
+
+    beta = np.arcsin(1.0 / Va)
+
+    # dynamic pressure at sea-level
+    rho = density(0.0)
+    q_bar = 0.5 * rho * Va**2
+
+    # expected aero coefficients
+    CY = aircraft.CY0 + aircraft.CY_beta * beta
+    Cl = aircraft.Cl0 + aircraft.Cl_beta * beta
+    Cn = aircraft.Cn0 + aircraft.Cn_beta * beta
+
+    # expected dimensional forces and moments
+    expected_Fy = q_bar * aircraft.S * CY
+    expected_L = q_bar * aircraft.S * aircraft.b * Cl
+    expected_N = q_bar * aircraft.S * aircraft.b * Cn
+
+    expected_forces = np.array([
+        0.0,
+        expected_Fy,
+        0.0
+    ])
+
+    expected_moments = np.array([
+        expected_L,
+        0.0,
+        expected_N
+    ])
+
+    np.testing.assert_allclose(
+        forces,
+        expected_forces,
+        atol = 1e-10
+    )
+
+    np.testing.assert_allclose(
+        moments,
+        expected_moments,
+        atol = 1e-10
+    )
+
+# nonzero control deflection and zero sideslip
+def test_aersonde_lateral_directional_control_inputs():
+
+    aircraft = AircraftParameters()
+
+    state = AircraftState(
+        pd = 0.0,
+        u = 25.0,
+        v = 0.0,
+        w = 0.0,
+        p = 0.0,
+        r = 0.0
+    )
+
+    delta_a = 0.05 # rads
+    delta_r = 0.03 # rads
+
+    forces, moments = aerosonde_lateral_directional_forces_moments(
+        state = state,
+        delta_a = delta_a,
+        delta_r = delta_r,
+        aircraft = aircraft
+    )
+
+    rho = density(0.0)
+    q_bar = 0.5 * rho * 25.0**2
+
+    # expected coefficients from control deflections
+    CY = (
+        aircraft.CY0
+        + aircraft.CY_delta_a * delta_a
+        + aircraft.CY_delta_r * delta_r
+    )
+
+    Cl = (
+        aircraft.Cl0
+        + aircraft.Cl_delta_a * delta_a
+        + aircraft.Cl_delta_r * delta_r
+    )
+
+    Cn = (
+        aircraft.Cn0
+        + aircraft.Cn_delta_a * delta_a
+        + aircraft.Cn_delta_r * delta_r
+    )
+
+    expected_forces = np.array([
+        0.0,
+        q_bar * aircraft.S * CY,
+        0.0
+    ])
+
+    expected_moments = np.array([
+        q_bar * aircraft.S * aircraft.b * Cl,
+        0.0,
+        q_bar * aircraft.S * aircraft.b * Cn
+    ])
+
+    np.testing.assert_allclose(
+        forces,
+        expected_forces,
+        atol = 1e-10
+    )
+
+    np.testing.assert_allclose(
+        moments,
+        expected_moments,
+        atol = 1e-10
+    )
+
+# test to verify wrappers roll/yaw rate mappings
+def test_aerosonde_lateral_directional_yaw_roll():
+    aircraft = AircraftParameters()
+
+    state = AircraftState(
+        pd = 0.0,
+        u = 25.0,
+        v = 0.0,
+        w = 0.0,
+        p = 2.0,
+        r = 3.0
+    )
+
+    delta_a = 0.05 # rads
+    delta_r = 0.03 # rads
+
+    forces, moments = aerosonde_lateral_directional_forces_moments(
+        state = state,
+        delta_a = delta_a,
+        delta_r = delta_r,
+        aircraft = aircraft
+    )
+
+    rho = density(0.0)
+    q_bar = 0.5 * rho * 25.0**2
+
+    p_hat = aircraft.b * state.p / (2.0 * 25.0)
+    r_hat = aircraft.b * state.r / (2.0 * 25.0)
+
+    # expected coefficients from control deflections
+    CY = (
+        aircraft.CY0
+        + aircraft.CY_p * p_hat
+        + aircraft.CY_r * r_hat
+        + aircraft.CY_delta_a * delta_a
+        + aircraft.CY_delta_r * delta_r
+    )
+
+    Cl = (
+        aircraft.Cl0
+        + aircraft.Cl_p * p_hat
+        + aircraft.Cl_r * r_hat
+        + aircraft.Cl_delta_a * delta_a
+        + aircraft.Cl_delta_r * delta_r
+    )
+
+    Cn = (
+        aircraft.Cn0
+        + aircraft.Cn_p * p_hat
+        + aircraft.Cn_r * r_hat
+        + aircraft.Cn_delta_a * delta_a
+        + aircraft.Cn_delta_r * delta_r
+    )
+
+    expected_forces = np.array([
+        0.0,
+        q_bar * aircraft.S * CY,
+        0.0
+    ])
+
+    expected_moments = np.array([
+        q_bar * aircraft.S * aircraft.b * Cl,
+        0.0,
+        q_bar * aircraft.S * aircraft.b * Cn
+    ])
+
+    np.testing.assert_allclose(
+        forces,
+        expected_forces,
+        atol = 1e-10
+    )
+
+    np.testing.assert_allclose(
+        moments,
+        expected_moments,
+        atol = 1e-10
+    )
+
+
+
+
+
+
+
+
+
 

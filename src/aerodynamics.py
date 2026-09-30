@@ -226,6 +226,67 @@ def lateral_directional_forces_moments(rho, Va, beta, roll_rate, yaw_rate, delta
 
     return forces_body, moments_body
 
+# calculate lateral-directional forces and moments using the current aircraft state and Aerosonde parameters 
+# (assume still air and the linear aerodynamic coefficient model)
+def aerosonde_lateral_directional_forces_moments(state, delta_a, delta_r, aircraft):
+
+    # 1. calculate altitude from NED position
+    altitude = -state.pd
+
+    # 2. calculate atmospheric density
+    rho = density(altitude)
+
+    # 3. calculate airspeed and aerodynamic angles
+    Va, alpha, beta = air_data(state)
+
+    # 4. gather lateral-directional coefficients
+    coefficients = {
+        # baseline
+        "CY0": aircraft.CY0,
+        "Cl0": aircraft.Cl0,
+        "Cn0": aircraft.Cn0,
+
+        # sideslip
+        "CY_beta": aircraft.CY_beta,
+        "Cl_beta": aircraft.Cl_beta,
+        "Cn_beta": aircraft.Cn_beta,
+
+        # roll-rate
+        "CY_p": aircraft.CY_p,
+        "Cl_p": aircraft.Cl_p,
+        "Cn_p": aircraft.Cn_p,
+
+        # Yaw-rate
+        "CY_r": aircraft.CY_r,
+        "Cl_r": aircraft.Cl_r,
+        "Cn_r": aircraft.Cn_r,
+
+        # Aileron
+        "CY_delta_a": aircraft.CY_delta_a,
+        "Cl_delta_a": aircraft.Cl_delta_a,
+        "Cn_delta_a": aircraft.Cn_delta_a,
+
+        # Rudder
+        "CY_delta_r": aircraft.CY_delta_r,
+        "Cl_delta_r": aircraft.Cl_delta_r,
+        "Cn_delta_r": aircraft.Cn_delta_r
+    }
+
+    # 5. calculate lateral-directional forces and moments
+    return lateral_directional_forces_moments(
+        rho = rho,
+        Va = Va,
+        beta = beta,
+        roll_rate = state.p,
+        yaw_rate = state.r,
+        delta_a = delta_a,
+        delta_r = delta_r,
+        S = aircraft.S,
+        b = aircraft.b,
+        coefficients = coefficients
+    )
+
+
 
 
 
