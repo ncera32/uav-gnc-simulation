@@ -93,7 +93,7 @@ class AircraftParameters:
     # Propulsion 
     # -------------------------------------------------------------------------------------------------------------------
    
-    P_max = 3.87 # Max Power of Motor [kW] CHECK UNITS!!!
+    P_max = 3.87 # Max Power of Motor [kW] CHECK UNITS!!! Motor power specification; not used in current propulsion model
     V_max = 44.4 # max voltage [V]
     D_prop = 0.508 # diameter of propeller [m]
     K_V = 0.0659 # back-emf voltage constant [V-s/rad]

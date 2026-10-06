@@ -1,7 +1,8 @@
 import numpy as np
 
 from src.state import AircraftState
-from src.dynamics import kinematics, translational_dynamics, gravity_force_body, inertia_tensor, rotational_dynamics, state_derivative
+from src.aircraft import AircraftParameters
+from src.dynamics import kinematics, translational_dynamics, gravity_force_body, inertia_tensor, rotational_dynamics, state_derivative, aircraft_state_derivative, aircraft_forces_moments
 
 # An aircraft pointing North, flying forward at 25 m/s, with no angular velocity should move North at 25 m/s while maintaining its current attitude.
 def test_level_northward_kinematics():
@@ -446,5 +447,74 @@ def test_state_derivative_combined_motion():
     )
 
     assert x_dot.shape == (12,)
+
+def test_aircraft_state_derivative():
+
+    aircraft = AircraftParameters()
+
+    state = AircraftState(
+        pn = 0.0,
+        pe = 0.0,
+        pd = -500.0,
+
+        u = 25.0,
+        v = 0.5,
+        w = 1.0,
+
+        phi = 0.0,
+        theta = 0.05,
+        psi = 0.0,
+
+        p = 0.01,
+        q = 0.02,
+        r = -0.01
+    )
+
+    delta_e = -0.02
+    delta_a = 0.01
+    delta_r = -0.01
+    delta_t = 0.6
+
+    derivative = aircraft_state_derivative(
+        state = state,
+        delta_e = delta_e,
+        delta_a = delta_a,
+        delta_r = delta_r,
+        delta_t = delta_t,
+        aircraft = aircraft
+    )
+
+    forces_body, moments_body = aircraft_forces_moments(
+        state = state,
+        delta_e = delta_e,
+        delta_a = delta_a,
+        delta_r = delta_r,
+        delta_t = delta_t,
+        aircraft = aircraft
+    )
+
+    inertia = inertia_tensor(
+        aircraft.Ixx,
+        aircraft.Iyy,
+        aircraft.Izz,
+        aircraft.Ixz
+    )
+
+    expected_derivative = state_derivative(
+        state = state,
+        forces_body = forces_body,
+        moments_body = moments_body,
+        mass = aircraft.m,
+        inertia = inertia
+    )
+
+    np.testing.assert_allclose(
+        derivative,
+        expected_derivative,
+        rtol = 1e-10,
+        atol = 1e-10
+    )
+
+    
 
 

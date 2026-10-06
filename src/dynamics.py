@@ -1,6 +1,7 @@
 import numpy as np
 
 from src.rotations import body_to_ned, ned_to_body, body_rates_to_euler_rates
+from src.forces_moments import aircraft_forces_moments
 
 def kinematics(state):
     # Calculate translational and rotational kinematics.
@@ -169,3 +170,40 @@ def state_derivative(
 
     return x_dot
 
+# Calculate the aircraft state derivative using state-dependent aerodynamic and propulsion forces.
+# Control inputs are held constant for this evaluation.
+def aircraft_state_derivative(
+       state,
+       delta_e,
+       delta_a,
+       delta_r,
+       delta_t,
+       aircraft 
+):
+    
+    # Calc. aero. + prop. forces + moments from CURRENT aircraft state
+    forces_body, moments_body = aircraft_forces_moments(
+        state = state,
+        delta_e = delta_e,
+        delta_a = delta_a,
+        delta_r = delta_r,
+        delta_t = delta_t,
+        aircraft = aircraft
+    )
+
+    # Construct inertia tensor using the existing function
+    inertia = inertia_tensor(
+        aircraft.Ixx,
+        aircraft.Iyy,
+        aircraft.Izz,
+        aircraft.Ixz
+    )
+
+    # Feed forces/moments into the already-tested rigid-body EOMs
+    return state_derivative(
+        state = state,
+        forces_body = forces_body,
+        moments_body = moments_body,
+        mass = aircraft.m,
+        inertia = inertia
+    )
