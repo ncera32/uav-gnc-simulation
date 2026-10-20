@@ -134,6 +134,66 @@ def aircraft_state_jacobian(
     )
 
 
+# Calculate the control Jacobian B for the nonlinear aircraft model.
+
+# Control order: [delta_e, delta_a, delta_r, delta_t]
+
+def aircraft_control_jacobian(
+        state,
+        delta_e,
+        delta_a,
+        delta_r,
+        delta_t,
+        aircraft,
+        step_sizes=None
+):
+    # Trimmed control vector
+    u0 = np.array([
+        delta_e,
+        delta_a,
+        delta_r,
+        delta_t
+    ], dtype=float)
+
+    # default control perturbations
+    if step_sizes is None:
+        step_sizes = np.array([
+            1e-5, # elevator [rad]
+            1e-5, # aileron [rad]
+            1e-5, # rudder [rad]
+            1e-5 # throttle [dimensionless]
+        ])
+
+    def dynamics_from_controls(controls):
+
+        delta_e_current = controls[0]
+        delta_a_current = controls[1]
+        delta_r_current = controls[2]
+        delta_t_current = controls[3]
+
+        return aircraft_state_derivative(
+            state = state,
+            delta_e = delta_e_current,
+            delta_a = delta_a_current,
+            delta_r = delta_r_current,
+            delta_t = delta_t_current,
+            aircraft = aircraft
+        )
+    
+    B = numerical_jacobian(
+        function = dynamics_from_controls,
+        x = u0,
+        step_sizes = step_sizes
+    )
+
+    return B
+
+
+
+
+
+
+
 
 
 

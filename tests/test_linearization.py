@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.linearization import numerical_jacobian, aircraft_state_jacobian
+from src.linearization import numerical_jacobian, aircraft_state_jacobian, aircraft_control_jacobian
 from src.aircraft import AircraftParameters
 from src.trim import solve_full_trim, full_trim_state
 
@@ -159,48 +159,178 @@ def test_aircrat_jacobian_step_size_sensitivity():
         linewidth = 160
     )
 
-    print("\n--- State Jacobian: Small Step Size (0.5h) ---")
-    print(A_small)
+    # TAKING PRINT OUT TO KEEP TEST OUTPUTS CLEAN!!!!
 
-    print("\n--- State Jacobian: Base Step Size (h) ---")
-    print(A_base)
+    #print("\n--- State Jacobian: Small Step Size (0.5h) ---")
+    #print(A_small)
 
-    print("\n--- State Jacobian: Large Step Size (2h) ---")
-    print(A_large)
+    #print("\n--- State Jacobian: Base Step Size (h) ---")
+    #print(A_base)
+
+    #print("\n--- State Jacobian: Large Step Size (2h) ---")
+    #print(A_large)
 
     # Calculate elementwise differences
-    differences_small = A_small - A_base
-    differences_large = A_large - A_base
+    #differences_small = A_small - A_base
+    #differences_large = A_large - A_base
 
-    print("\n--- Difference: Small vs Base ---")
+    #print("\n--- Difference: Small vs Base ---")
     #print(differences_small)
-    print(
-        np.array2string(
-            differences_small,
-            formatter = {"float_kind": lambda x: f"{x:.3e}"}
-        )
-    )
+    #print(
+    #    np.array2string(
+    #        differences_small,
+    #        formatter = {"float_kind": lambda x: f"{x:.3e}"}
+    #    )
+    #)
 
-    print("\n--- Difference: Large vs Base ---")
+    #print("\n--- Difference: Large vs Base ---")
     #print(differences_large)
-    print(
-        np.array2string(
-            differences_large,
-            formatter = {"float_kind": lambda x: f"{x:.3e}"}
-        )
-    )
+    #print(
+    #    np.array2string(
+    #        differences_large,
+    #        formatter = {"float_kind": lambda x: f"{x:.3e}"}
+    #    )
+   #)
 
     # Quantify the larget difference
-    print("\n--- Maximum Abosulte Differences ---")
-    print(
-        f"Small vs Base: "
-        f"{np.max(np.abs(differences_small)):.6e}"
+    #print("\n--- Maximum Abosulte Differences ---")
+    #print(
+    #    f"Small vs Base: "
+    #    f"{np.max(np.abs(differences_small)):.6e}"
+    #)
+
+    #print(
+    #    f"Large vs Base: "
+    #    f"{np.max(np.abs(differences_large)):.6e}"
+    #)
+
+def test_aircraft_control_jacobian():
+
+    aircraft = AircraftParameters()
+
+    Va = 25.0
+    altitude = 500.0
+
+    # Solve for full 6-DOF trim
+    trim_result = solve_full_trim(
+        Va = Va,
+        altitude = altitude,
+        aircraft = aircraft
     )
 
-    print(
-        f"Large vs Base: "
-        f"{np.max(np.abs(differences_large)):.6e}"
+    assert trim_result.success
+
+    alpha, phi, delta_e, delta_a, delta_r, delta_t = (
+        trim_result.x
     )
+
+    trim_state = full_trim_state(
+        Va = Va,
+        altitude = altitude,
+        alpha = alpha,
+        phi = phi
+    )
+
+    # calculate control jacobian
+    B = aircraft_control_jacobian(
+        state = trim_state,
+        delta_e = delta_e,
+        delta_a = delta_a,
+        delta_r = delta_r,
+        delta_t = delta_t,
+        aircraft = aircraft
+    )
+
+    # check dimensions
+    assert B.shape == (12, 4)
+
+    # check that all entries are finite
+    assert np.all(np.isfinite(B))
+
+    # controls do not directly change position
+    # or Euler-angle kinematics at a fixed state
+    np.testing.assert_allclose(
+        B[0:3, :],
+        0.0,
+        atol = 1e-10
+    )
+
+    np.testing.assert_allclose(
+        B[6:9, :],
+        0.0,
+        atol = 1e-10
+    )
+
+    # positive elevator deflection produces negative pitch acceleration
+    assert B[10, 0] < 0.0
+
+    # aileron deflection produces a roll-acceleration response
+    assert B[9, 1] > 0.0
+
+def test_control_jacobian_step_size_sensitivity():
+
+    aircraft = AircraftParameters()
+
+    Va = 25.0
+    altitude = 500.0
+
+    trim_result = solve_full_trim(
+        Va = Va,
+        altitude = altitude,
+        aircraft = aircraft
+    )
+
+    assert trim_result.success
+
+    alpha, phi, delta_e, delta_a, delta_r, delta_t = (
+        trim_result.x
+    )
+
+    trim_state = full_trim_state(
+        Va = Va,
+        altitude = altitude,
+        alpha = alpha,
+        phi = phi
+    )
+
+    base_steps = np.array([
+        1e-5,
+        1e-5,
+        1e-5,
+        1e-5
+    ])
+
+    def calculate_B(steps):
+        return aircraft_control_jacobian(
+            state = trim_state,
+            delta_e = delta_e,
+            delta_a = delta_a,
+            delta_r = delta_r,
+            delta_t = delta_t,
+            aircraft = aircraft,
+            step_sizes = steps
+        )
+    
+    B_small = calculate_B(0.5 * base_steps)
+    B_base = calculate_B(base_steps)
+    B_large = calculate_B(2.0 * base_steps)
+
+    np.testing.assert_allclose(
+        B_small,
+        B_base,
+        rtol = 1e-4,
+        atol = 1e-6
+    )
+
+    np.testing.assert_allclose(
+        B_large,
+        B_base,
+        rtol = 1e-4,
+        atol = 1e-6
+    )
+
+
+
 
 
 
