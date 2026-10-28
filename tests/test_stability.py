@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from src.stability import calculate_eigenvalues, calculate_eigenmodes, scale_state_matrix, extract_state_subsystem
+from src.stability import calculate_eigenvalues, calculate_eigenmodes, scale_state_matrix, extract_state_subsystem, modal_characteristics, build_modal_report
 from src.linearization import aircraft_state_jacobian
 from src.aircraft import AircraftParameters
 from src.trim import solve_full_trim, full_trim_state
@@ -222,6 +222,94 @@ def test_dynamic_subsystem_extraction():
         A[3:12, 3:12]
     )
 
+
+def test_modal_characteristics_complex_mode():
+
+    eigenvalue = -2.0 + 3.0j
+
+    characteristics = modal_characteristics(eigenvalue)
+
+    assert np.isclose(
+        characteristics["natural_frequency"],
+        np.sqrt(13)
+    )
+
+    assert np.isclose(
+        characteristics["damping_ratio"],
+        2 / np.sqrt(13)
+    )
+
+    assert np.isclose(
+        characteristics["period"],
+        2 * np.pi / 3
+    )
+
+    assert characteristics["stable"]
+    assert not characteristics["unstable"]
+ 
+
+def test_build_modal_report():
+
+    eigenvalues = np.array([
+        -2.0 + 3.0j,
+        -5.0 + 0.0j,
+        0.1 + 0.0j
+    ])
+
+    names = [
+        "Oscillatory",
+        "Stable real",
+        "Unstable real"
+    ]
+
+    report = build_modal_report(
+        eigenvalues,
+        names
+    )
+
+    assert len(report) == 3
+
+    assert report[0]["name"] == "Oscillatory"
+    assert report[0]["stable"]
+
+    assert report[1]["name"] == "Stable real"
+    assert report[1]["stable"]
+
+    assert report[2]["name"] == "Unstable real"
+    assert report[2]["unstable"]
+
+    assert np.isclose(
+        report[2]["doubling_time"],
+        np.log(2) / 0.1
+    )
+
+
+def test_build_modal_report_mismatched_lengths():
+
+    eigenvalues = np.array([-1.0, -2.0])
+
+    names = ["Mode 1"]
+
+    with pytest.raises(ValueError):
+        build_modal_report(
+            eigenvalues,
+            names
+        )
+
+def test_modal_characteristics_stable_real_mode():
+
+    characteristics = modal_characteristics(-20.340081)
+
+    assert characteristics["stable"]
+    assert not characteristics["unstable"]
+
+    assert characteristics["period"] is None
+    assert characteristics["doubling_time"] is None
+
+    assert np.isclose(
+        characteristics["time_constant"],
+        1 / 20.340081
+    )
 
 
 

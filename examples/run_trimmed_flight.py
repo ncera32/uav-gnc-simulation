@@ -118,6 +118,12 @@ def main():
         psi_history - initial_state.psi
     )
 
+    # horizontal distance covered check
+    horizontal_distance = np.sqrt(
+        (pn[-1] - pn[0])**2
+        + (pe[-1] - pe[0])**2
+    )
+
     print("\nTrimmed Flight Simulation")
     print("---------------------------")
 
@@ -148,6 +154,11 @@ def main():
         f"Heading: {np.max(np.abs(heading_error)):.6e} deg"
     )
 
+    # horizontal distance check
+
+    print(
+        f"\nHorizontal distance: {horizontal_distance:.3f} m"
+    )
 
     # Airspeed and Altitude Deviation Plots
 
